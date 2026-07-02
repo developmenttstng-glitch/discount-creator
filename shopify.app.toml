@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "78c332f9b775fe2b24f35331ee2e9923"
-application_url = "https://example.com"
+application_url = "https://discount-creator.onrender.com"
 embedded = true
 name = "discount-creator"
 
@@ -45,8 +45,7 @@ api_version = "2026-10"
   topics = [ "app/scopes_update" ]
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://discount-creator.onrender.com/auth/callback" ]
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
