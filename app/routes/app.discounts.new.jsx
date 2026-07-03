@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -84,13 +84,15 @@ export default function NewDiscount() {
   const [type, setType] = useState("PERCENTAGE");
 
   const isLoading = ["loading","submitting"].includes(fetcher.state) && fetcher.formMethod === "POST";
-  const errors    = fetcher.data?.errors || [];
+const errors    = fetcher.data?.errors || [];
 
-  // Redirect to dashboard on success
+// Show toast and redirect only once using useEffect
+useEffect(() => {
   if (fetcher.data?.success && fetcher.data?.id) {
     shopify.toast.show("Discount created!");
     navigate("/app");
   }
+}, [fetcher.data]);
 
   const sectionStyle = {
     background: "#fff",
