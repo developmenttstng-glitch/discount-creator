@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -78,21 +78,22 @@ export const action = async ({ request }) => {
 };
 
 export default function NewDiscount() {
-  const fetcher  = useFetcher();
-  const shopify  = useAppBridge();
-  const navigate = useNavigate();
+  const fetcher     = useFetcher();
+  const shopify     = useAppBridge();
+  const navigate    = useNavigate();
   const [type, setType] = useState("PERCENTAGE");
+  const handledRef  = useRef(false);
 
   const isLoading = ["loading","submitting"].includes(fetcher.state) && fetcher.formMethod === "POST";
-const errors    = fetcher.data?.errors || [];
+  const errors    = fetcher.data?.errors || [];
 
-// Show toast and redirect only once using useEffect
-useEffect(() => {
-  if (fetcher.data?.success && fetcher.data?.id) {
-    shopify.toast.show("Discount created!");
-    navigate("/app");
-  }
-}, [fetcher.data]);
+  useEffect(() => {
+    if (fetcher.data?.success && fetcher.data?.id && !handledRef.current) {
+      handledRef.current = true;
+      shopify.toast.show("Discount created!");
+      navigate("/app");
+    }
+  }, [fetcher.data]);
 
   const sectionStyle = {
     background: "#fff",
@@ -141,14 +142,20 @@ useEffect(() => {
 
       {/* Back link */}
       <div style={{ marginBottom: 16 }}>
-        <Link to="/app" style={{ fontSize:13, color:"#008060", textDecoration:"none", display:"inline-flex", alignItems:"center", gap:4 }}>
+        <Link to="/app" style={{
+          fontSize:13, color:"#008060", textDecoration:"none",
+          display:"inline-flex", alignItems:"center", gap:4
+        }}>
           ← Back to discounts
         </Link>
       </div>
 
       {/* Errors */}
       {errors.length > 0 && (
-        <div style={{ background:"#fff4f4", border:"1px solid #ffa8a8", borderRadius:8, padding:"14px 18px", marginBottom:16 }}>
+        <div style={{
+          background:"#fff4f4", border:"1px solid #ffa8a8",
+          borderRadius:8, padding:"14px 18px", marginBottom:16
+        }}>
           {errors.map((e, i) => (
             <div key={i} style={{ fontSize:13, color:"#d82c0d" }}>⚠ {e.message}</div>
           ))}
@@ -172,8 +179,11 @@ useEffect(() => {
               <p style={hint}>Internal name — customers won't see this</p>
 
               <label style={lbl}>Discount Code *</label>
-              <input style={{...input, fontFamily:"monospace", textTransform:"uppercase"}}
-                name="code" placeholder="e.g. SUMMER20" required
+              <input
+                style={{...input, fontFamily:"monospace", textTransform:"uppercase"}}
+                name="code"
+                placeholder="e.g. SUMMER20"
+                required
                 onChange={e => e.target.value = e.target.value.toUpperCase()}
               />
               <p style={hint}>Customers enter this at checkout — auto uppercased</p>
@@ -184,13 +194,15 @@ useEffect(() => {
               <div style={{ fontSize:14, fontWeight:700, marginBottom:16, color:"#202223" }}>
                 Discount Value
               </div>
-
               <div style={row}>
                 <div>
                   <label style={lbl}>Type</label>
-                  <select style={{...input, marginBottom:0}}
-                    name="type" value={type}
-                    onChange={e => setType(e.target.value)}>
+                  <select
+                    style={{...input, marginBottom:0}}
+                    name="type"
+                    value={type}
+                    onChange={e => setType(e.target.value)}
+                  >
                     <option value="PERCENTAGE">Percentage Off</option>
                     <option value="FIXED_AMOUNT">Fixed Amount Off</option>
                   </select>
@@ -199,8 +211,11 @@ useEffect(() => {
                   <label style={lbl}>
                     {type === "PERCENTAGE" ? "Percentage (%)" : "Amount ($)"} *
                   </label>
-                  <input style={{...input, marginBottom:0}}
-                    name="value" type="number" min="0"
+                  <input
+                    style={{...input, marginBottom:0}}
+                    name="value"
+                    type="number"
+                    min="0"
                     step={type === "PERCENTAGE" ? "1" : "0.01"}
                     placeholder={type === "PERCENTAGE" ? "e.g. 20" : "e.g. 10.00"}
                     required
@@ -243,20 +258,32 @@ useEffect(() => {
               <div style={{ fontSize:14, fontWeight:700, marginBottom:16, color:"#202223" }}>
                 Usage Limits
               </div>
-
               <label style={lbl}>Total Usage Limit</label>
-              <input style={input} name="usageLimit" type="number" min="1"
-                placeholder="Blank = unlimited"/>
+              <input
+                style={input}
+                name="usageLimit"
+                type="number"
+                min="1"
+                placeholder="Blank = unlimited"
+              />
               <p style={hint}>Max times this code can be used in total</p>
-
-              <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", marginBottom:8 }}>
-                <input type="checkbox" name="oncePerCustomer" value="true"
-                  style={{ width:16, height:16 }}/>
-                <span style={{ fontSize:13, color:"#202223" }}>Limit to one use per customer</span>
+              <label style={{
+                display:"flex", alignItems:"center", gap:8,
+                cursor:"pointer", marginBottom:8
+              }}>
+                <input
+                  type="checkbox"
+                  name="oncePerCustomer"
+                  value="true"
+                  style={{ width:16, height:16 }}
+                />
+                <span style={{ fontSize:13, color:"#202223" }}>
+                  Limit to one use per customer
+                </span>
               </label>
             </div>
 
-            {/* Summary box */}
+            {/* Summary */}
             <div style={{ ...sectionStyle, background:"#f9fafb" }}>
               <div style={{ fontSize:14, fontWeight:700, marginBottom:12, color:"#202223" }}>
                 Summary
@@ -269,33 +296,40 @@ useEffect(() => {
             </div>
 
             {/* Submit */}
-            <button type="submit" disabled={isLoading} style={{
-              width: "100%",
-              padding: "12px",
-              background: isLoading ? "#aaa" : "#008060",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: isLoading ? "not-allowed" : "pointer",
-            }}>
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: isLoading ? "#aaa" : "#008060",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: isLoading ? "not-allowed" : "pointer",
+              }}
+            >
               {isLoading ? "Creating..." : "Create Discount"}
             </button>
 
             <Link to="/app">
-              <button type="button" style={{
-                width: "100%",
-                padding: "12px",
-                background: "#fff",
-                color: "#202223",
-                border: "1px solid #e1e3e5",
-                borderRadius: 6,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                marginTop: 8,
-              }}>
+              <button
+                type="button"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  background: "#fff",
+                  color: "#202223",
+                  border: "1px solid #e1e3e5",
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  marginTop: 8,
+                }}
+              >
                 Cancel
               </button>
             </Link>
