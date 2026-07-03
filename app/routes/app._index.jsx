@@ -139,22 +139,22 @@ export default function Dashboard() {
     <s-page heading="Discount Manager">
 
       {/* New Discount Button */}
-      <div slot="primary-action">
-        <Link to="/app/discounts/new">
-          <button style={{
-            padding: "8px 16px",
-            background: "#008060",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}>
-            + New Discount
-          </button>
-        </Link>
-      </div>
+<div style={{ display:"flex", justifyContent:"flex-end", marginBottom:16 }}>
+  <Link to="/app/discounts/new">
+    <button style={{
+      padding: "10px 20px",
+      background: "#008060",
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+    }}>
+      + New Discount
+    </button>
+  </Link>
+</div>
 
       {/* Summary Cards */}
       <s-section>
