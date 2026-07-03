@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 
-// ── Loader: fetch single discount ─────────────────────────────────────────────
+// ── Loader ────────────────────────────────────────────────────────────────────
 export const loader = async ({ request, params }) => {
   const { admin } = await authenticate.admin(request);
   const id        = decodeURIComponent(params.id);
@@ -44,14 +44,13 @@ export const loader = async ({ request, params }) => {
   return { discount };
 };
 
-// ── Action: update / deactivate / activate / delete ───────────────────────────
+// ── Action ────────────────────────────────────────────────────────────────────
 export const action = async ({ request, params }) => {
   const { admin } = await authenticate.admin(request);
   const formData  = await request.formData();
   const intent    = formData.get("intent");
   const id        = decodeURIComponent(params.id);
 
-  // ── Delete ──────────────────────────────────────────────────────────────────
   if (intent === "delete") {
     await admin.graphql(
       `#graphql
@@ -66,7 +65,6 @@ export const action = async ({ request, params }) => {
     return { deleted: true };
   }
 
-  // ── Deactivate ──────────────────────────────────────────────────────────────
   if (intent === "deactivate") {
     await admin.graphql(
       `#graphql
@@ -81,7 +79,6 @@ export const action = async ({ request, params }) => {
     return { toggled: "deactivated" };
   }
 
-  // ── Activate ────────────────────────────────────────────────────────────────
   if (intent === "activate") {
     await admin.graphql(
       `#graphql
@@ -96,7 +93,6 @@ export const action = async ({ request, params }) => {
     return { toggled: "activated" };
   }
 
-  // ── Update ──────────────────────────────────────────────────────────────────
   if (intent === "update") {
     const title      = formData.get("title");
     const type       = formData.get("type");
@@ -183,11 +179,12 @@ function formatDate(d) {
 
 // ── UI ────────────────────────────────────────────────────────────────────────
 export default function DiscountDetail() {
-  const { discount }   = useLoaderData();
-  const fetcher        = useFetcher();
-  const shopify        = useAppBridge();
-  const navigate       = useNavigate();
+  const { discount }          = useLoaderData();
+  const fetcher               = useFetcher();
+  const shopify               = useAppBridge();
+  const navigate              = useNavigate();
   const [editing, setEditing] = useState(false);
+  const handledRef            = useRef(null);
 
   const d      = discount.codeDiscount;
   const code   = d?.codes?.nodes?.[0]?.code || "—";
@@ -196,18 +193,33 @@ export default function DiscountDetail() {
   const st     = getStatusStyle(status);
   const result = fetcher.data;
 
-  // Handle results
-  if (result?.deleted) {
-    shopify.toast.show("Discount deleted.");
-    navigate("/app");
-  }
-  if (result?.toggled) {
-    shopify.toast.show(result.toggled === "activated" ? "Discount activated." : "Discount deactivated.");
-  }
-  if (result?.success) {
-    shopify.toast.show("Discount updated!");
-    setEditing(false);
-  }
+  // ── Handle action results safely in useEffect ─────────────────────────────
+  useEffect(() => {
+    if (!result || handledRef.current === result) return;
+    handledRef.current = result;
+
+    if (result.deleted) {
+      shopify.toast.show("Discount deleted.");
+      navigate("/app");
+      return;
+    }
+    if (result.toggled) {
+      shopify.toast.show(
+        result.toggled === "activated"
+          ? "Discount activated."
+          : "Discount deactivated."
+      );
+      return;
+    }
+    if (result.success) {
+      shopify.toast.show("Discount updated!");
+      setEditing(false);
+      return;
+    }
+  }, [result]);
+
+  const isLoading = ["loading","submitting"].includes(fetcher.state) &&
+    fetcher.formMethod === "POST";
 
   const sectionStyle = {
     background: "#fff",
@@ -254,21 +266,20 @@ export default function DiscountDetail() {
   const infoLabel = { color:"#6d7175", fontWeight:500 };
   const infoValue = { color:"#202223", fontWeight:600, textAlign:"right" };
 
-  const isLoading = ["loading","submitting"].includes(fetcher.state) && fetcher.formMethod === "POST";
-
   return (
     <s-page heading={d?.title || "Discount Detail"}>
 
-      {/* Back */}
       <div style={{ marginBottom:16 }}>
         <Link to="/app" style={{ fontSize:13, color:"#008060", textDecoration:"none" }}>
           ← Back to discounts
         </Link>
       </div>
 
-      {/* Error banner */}
       {result?.errors?.length > 0 && (
-        <div style={{ background:"#fff4f4", border:"1px solid #ffa8a8", borderRadius:8, padding:"14px 18px", marginBottom:16 }}>
+        <div style={{
+          background:"#fff4f4", border:"1px solid #ffa8a8",
+          borderRadius:8, padding:"14px 18px", marginBottom:16
+        }}>
           {result.errors.map((e, i) => (
             <div key={i} style={{ fontSize:13, color:"#d82c0d" }}>⚠ {e.message}</div>
           ))}
@@ -277,10 +288,8 @@ export default function DiscountDetail() {
 
       <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16, alignItems:"start" }}>
 
-        {/* Left — Info + Edit */}
+        {/* Left */}
         <div>
-
-          {/* Discount info */}
           <div style={sectionStyle}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
               <div style={{ fontSize:14, fontWeight:700, color:"#202223" }}>Discount Details</div>
@@ -294,7 +303,10 @@ export default function DiscountDetail() {
 
             <div style={infoRow}>
               <span style={infoLabel}>Discount Code</span>
-              <span style={{ ...infoValue, fontFamily:"monospace", fontSize:15, background:"#f1f2f3", padding:"2px 10px", borderRadius:4 }}>
+              <span style={{
+                ...infoValue, fontFamily:"monospace", fontSize:15,
+                background:"#f1f2f3", padding:"2px 10px", borderRadius:4
+              }}>
                 {code}
               </span>
             </div>
@@ -304,7 +316,10 @@ export default function DiscountDetail() {
             </div>
             <div style={infoRow}>
               <span style={infoLabel}>Times Used</span>
-              <span style={infoValue}>{d?.asyncUsageCount ?? 0} {d?.usageLimit ? `/ ${d.usageLimit}` : "/ Unlimited"}</span>
+              <span style={infoValue}>
+                {d?.asyncUsageCount ?? 0}
+                {d?.usageLimit ? ` / ${d.usageLimit}` : " / Unlimited"}
+              </span>
             </div>
             <div style={infoRow}>
               <span style={infoLabel}>One Use Per Customer</span>
@@ -321,7 +336,7 @@ export default function DiscountDetail() {
           </div>
 
           {/* Edit form */}
-          {editing ? (
+          {editing && (
             <div style={sectionStyle}>
               <div style={{ fontSize:14, fontWeight:700, marginBottom:16, color:"#202223" }}>
                 Edit Discount
@@ -336,22 +351,21 @@ export default function DiscountDetail() {
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
                   <div>
                     <label style={lbl}>Type</label>
-                    <select style={{...input}} name="type" defaultValue={getValueType(val)}>
+                    <select style={input} name="type" defaultValue={getValueType(val)}>
                       <option value="PERCENTAGE">Percentage Off</option>
                       <option value="FIXED_AMOUNT">Fixed Amount Off</option>
                     </select>
                   </div>
                   <div>
                     <label style={lbl}>Value</label>
-                    <input style={input} name="value" type="number" min="0" step="0.01"
-                      defaultValue={getRawValue(val)}/>
+                    <input style={input} name="value" type="number"
+                      min="0" step="0.01" defaultValue={getRawValue(val)}/>
                   </div>
                 </div>
 
                 <label style={lbl}>Usage Limit</label>
                 <input style={input} name="usageLimit" type="number" min="1"
-                  defaultValue={d?.usageLimit || ""}
-                  placeholder="Blank = unlimited"/>
+                  defaultValue={d?.usageLimit || ""} placeholder="Blank = unlimited"/>
                 <p style={hint}>Leave blank for unlimited uses</p>
 
                 <label style={lbl}>End Date</label>
@@ -361,71 +375,72 @@ export default function DiscountDetail() {
 
                 <div style={{ display:"flex", gap:8 }}>
                   <button type="submit" disabled={isLoading} style={{
-                    flex:1, padding:"10px", background: isLoading ? "#aaa" : "#008060",
+                    flex:1, padding:"10px",
+                    background: isLoading ? "#aaa" : "#008060",
                     color:"#fff", border:"none", borderRadius:6,
-                    fontSize:13, fontWeight:700, cursor: isLoading ? "not-allowed" : "pointer",
+                    fontSize:13, fontWeight:700,
+                    cursor: isLoading ? "not-allowed" : "pointer",
                   }}>
                     {isLoading ? "Saving..." : "Save Changes"}
                   </button>
                   <button type="button" onClick={() => setEditing(false)} style={{
                     flex:1, padding:"10px", background:"#fff",
-                    color:"#202223", border:"1px solid #e1e3e5", borderRadius:6,
-                    fontSize:13, fontWeight:600, cursor:"pointer",
+                    color:"#202223", border:"1px solid #e1e3e5",
+                    borderRadius:6, fontSize:13, fontWeight:600, cursor:"pointer",
                   }}>
                     Cancel
                   </button>
                 </div>
               </fetcher.Form>
             </div>
-          ) : null}
-
+          )}
         </div>
 
-        {/* Right — Actions */}
+        {/* Right */}
         <div>
           <div style={sectionStyle}>
             <div style={{ fontSize:14, fontWeight:700, marginBottom:16, color:"#202223" }}>
               Actions
             </div>
 
-            {/* Edit */}
             <button onClick={() => setEditing(e => !e)} style={{
               width:"100%", padding:"10px", background:"#f1f2f3",
               color:"#202223", border:"1px solid #e1e3e5", borderRadius:6,
               fontSize:13, fontWeight:600, cursor:"pointer", marginBottom:8,
             }}>
-              {editing ? "Cancel Edit" : "✏️ Edit Discount"}
+              {editing ? "✕ Cancel Edit" : "✏️ Edit Discount"}
             </button>
 
-            {/* Activate / Deactivate */}
             <fetcher.Form method="POST">
-              <input type="hidden" name="intent" value={status === "ACTIVE" ? "deactivate" : "activate"}/>
+              <input type="hidden" name="intent"
+                value={status === "ACTIVE" ? "deactivate" : "activate"}/>
               <button type="submit" style={{
                 width:"100%", padding:"10px",
                 background: status === "ACTIVE" ? "#fff3cd" : "#d4edda",
                 color:      status === "ACTIVE" ? "#856404" : "#155724",
-                border:`1px solid ${status === "ACTIVE" ? "#ffc107" : "#28a745"}`,
-                borderRadius:6, fontSize:13, fontWeight:600, cursor:"pointer", marginBottom:8,
+                border: `1px solid ${status === "ACTIVE" ? "#ffc107" : "#28a745"}`,
+                borderRadius:6, fontSize:13, fontWeight:600,
+                cursor:"pointer", marginBottom:8,
               }}>
                 {status === "ACTIVE" ? "⏸ Deactivate" : "▶ Activate"}
               </button>
             </fetcher.Form>
 
-            {/* Delete */}
-            <fetcher.Form method="POST"
-              onSubmit={e => { if (!confirm("Delete this discount? This cannot be undone.")) e.preventDefault() }}>
+            <fetcher.Form method="POST" onSubmit={e => {
+              if (!confirm("Delete this discount? This cannot be undone."))
+                e.preventDefault();
+            }}>
               <input type="hidden" name="intent" value="delete"/>
               <button type="submit" style={{
                 width:"100%", padding:"10px", background:"#fff",
-                color:"#d82c0d", border:"1px solid #d82c0d", borderRadius:6,
-                fontSize:13, fontWeight:600, cursor:"pointer",
+                color:"#d82c0d", border:"1px solid #d82c0d",
+                borderRadius:6, fontSize:13, fontWeight:600, cursor:"pointer",
               }}>
                 🗑 Delete Discount
               </button>
             </fetcher.Form>
           </div>
 
-          {/* Usage progress */}
           {d?.usageLimit && (
             <div style={sectionStyle}>
               <div style={{ fontSize:14, fontWeight:700, marginBottom:12, color:"#202223" }}>
@@ -438,7 +453,7 @@ export default function DiscountDetail() {
                 <div style={{
                   height:"100%", borderRadius:4,
                   background: d.asyncUsageCount / d.usageLimit > 0.8 ? "#d82c0d" : "#008060",
-                  width: `${Math.min(100, (d.asyncUsageCount / d.usageLimit) * 100)}%`,
+                  width: `${Math.min(100,(d.asyncUsageCount / d.usageLimit) * 100)}%`,
                   transition:"width 0.3s",
                 }}/>
               </div>
@@ -449,10 +464,9 @@ export default function DiscountDetail() {
               )}
             </div>
           )}
-
         </div>
-      </div>
 
+      </div>
     </s-page>
   );
 }
