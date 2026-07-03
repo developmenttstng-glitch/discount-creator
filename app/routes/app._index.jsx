@@ -264,17 +264,20 @@ export default function Dashboard() {
                               View
                             </button>
                           </Link>
-                          <fetcher.Form method="POST">
-                            <input type="hidden" name="intent" value="delete"/>
-                            <input type="hidden" name="id" value={node.id}/>
-                            <button type="submit" style={{
-                              padding:"4px 12px", background:"#fff",
-                              border:"1px solid #d82c0d", borderRadius:4,
-                              fontSize:12, cursor:"pointer", color:"#d82c0d", fontWeight:500,
-                            }}>
-                              Delete
-                            </button>
-                          </fetcher.Form>
+                          <fetcher.Form method="POST" onSubmit={e => {
+  if (!confirm(`Delete discount "${code}"? This cannot be undone.`))
+    e.preventDefault();
+}}>
+  <input type="hidden" name="intent" value="delete"/>
+  <input type="hidden" name="id" value={node.id}/>
+  <button type="submit" style={{
+    padding:"4px 12px", background:"#fff",
+    border:"1px solid #d82c0d", borderRadius:4,
+    fontSize:12, cursor:"pointer", color:"#d82c0d", fontWeight:500,
+  }}>
+    Delete
+  </button>
+</fetcher.Form>
                         </div>
                       </td>
                     </tr>
